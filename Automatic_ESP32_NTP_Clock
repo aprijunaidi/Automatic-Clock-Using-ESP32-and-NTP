@@ -1,0 +1,209 @@
+Automatic Clock with ESP32 and NTP
+
+This project demonstrates how to build a clock that automatically synchronizes its time with an NTP (Network Time Protocol) server, using an ESP32 microcontroller.
+
+Key Features:
+
+Retrieves accurate time from an NTP server
+Displays the current time on a user-defined output device is MAX7219 LED Matrix
+Optionally handles daylight saving time adjustments
+Potential for customization and expansion
+Required Components:
+
+ESP32 development board
+WiFi connection
+Jumper wires
+Output device MAX7219 LED Matrix
+
+Software Requirements:
+
+Arduino IDE with ESP32 board support
+NTPClient library (installable through the Arduino IDE Library Manager)
+
+The Code :
+
+#include <NTPClient.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
+
+#include <MD_Parola.h>
+#include <MD_MAX72xx.h>
+#include <SPI.h>
+
+//#define HARDWARE_TYPE MD_MAX72XX::GENERIC_HW
+#define HARDWARE_TYPE MD_MAX72XX::FC16_HW
+#define MAX_DEVICES 4
+
+#define CLK_PIN   18 // or SCK
+#define DATA_PIN  19 // or MOSI
+#define CS_PIN    5 // or SS 
+
+//Buat object Display LED MAX7219
+MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
+//=================================================================================
+// WiFi
+const char* ssid     = "POCO X3 Pro";     // change to your SSID
+const char* password = "linggogeni1";     // change to yout SDID Password
+//==================================================================================
+
+//Time Zone 
+//Time Calculate  = UTC+8 = 28800 (60*60*8) // Malaysia Time
+const long utcOffsetInSecond=28800;
+
+
+//define  NTP Client.
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "asia.pool.ntp.org", utcOffsetInSecond );
+
+String bulan[12] = {"Jan", "Feb", "Mar","Apr","Mei", "Jun","Jul","Agu","Sep","Okt", "Nov", "Des"};
+
+String dot = " ";
+//siapkan variable untuk tanggal dalam bentuk karakter array
+char arrTgl[12]; 
+
+//the Variable counter
+int counter = 0;
+//sediakan variable menentukan posisi object yang tampil
+String posisi = "jam";
+
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+
+  //set LED MAX7219
+  myDisplay.begin();
+  myDisplay.setIntensity(0); // nilai   0-15
+  myDisplay.displayClear();
+
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status()!=WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+
+  // if connected, start to read NTP, Clock aand date
+  timeClient.begin();
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+  //baca_jam();
+  //baca_tanggal();
+  // uji posisi
+  if (posisi == "jam")
+      baca_jam();
+  else if(posisi = "tanggal")
+      baca_tanggal();
+
+}
+
+
+// void to read hours
+void baca_jam(){
+    //update ntp client
+   timeClient.update();
+  //baca jam NTP
+  String jam_lengkap = timeClient.getFormattedTime();
+
+  // Parsing houra, minutes, seconds
+  String jam, menit, detik, jam_sekarang;
+  jam = String(timeClient.getHours());
+  menit = String(timeClient.getMinutes());
+  detik = String(timeClient.getSeconds());
+
+  if(dot == " ")
+    dot = ":";
+  else
+    dot = " ";
+    
+   // display current time
+   jam_sekarang = jam + dot + menit; // + ":" + detik;
+  Serial.println("Jam Sekarang: " + jam_sekarang);
+
+  //Display to LED 
+  myDisplay.setTextAlignment(PA_CENTER);   //PA_LEFT / PA_RIGHT/ PA_CENTER
+
+  //Start to Dispalying the time
+  myDisplay.print(jam_sekarang);
+
+  counter ++;
+  if (counter ==20){
+    posisi = "tanggal";
+    counter=0;
+    myDisplay.displayClear();
+  }
+
+  Serial.println(counter);
+  //Serial.println("Jam Sekarang: " + jam_lengkap);
+   delay(1000);
+}
+
+
+// void read the date
+void baca_tanggal(){
+
+   //update ntp client
+   timeClient.update();
+
+   //baca epochTime
+   unsigned long epochTime = timeClient.getEpochTime();
+   
+   // ambil struck tanggal
+
+   struct tm *ptm = gmtime((time_t *)&epochTime);
+
+   //Parsing tanggal, bulan, tahun
+   int tgl = ptm->tm_mday;
+   
+   //cara menambahkan karakter dari 10
+   String sTgl="";
+
+   if (tgl<10)
+      sTgl = "0" + String(tgl);
+    else
+      sTgl = String(tgl);
+
+
+   int bln = ptm->tm_mon + 1;
+   //baca array bulan, tampung dalam variabel
+
+   String array_bulan = bulan[bln-1];
+
+   int thn = ptm->tm_year + 1900;
+
+   //gabung
+   //String tanggal_sekarang = String(tgl) + "/" + String(bln) + "/" + String(thn);
+   
+   //String tanggal_sekarang = String(tgl) + " " + array_bulan + " " + String(thn);
+   String tanggal_sekarang = sTgl + " " + array_bulan + " " + String(thn);
+
+   Serial.println(tanggal_sekarang);
+
+   //ubah tipe string tanggal sekarang menjadi char array
+   tanggal_sekarang.toCharArray(arrTgl, 12);
+
+   if (myDisplay.displayAnimate()){
+    //myDisplay.displayText(arrTgl, myDisplay.getTextAlignment(), myDisplay.getSpeed(), myDisplay.getPause(), 50, 200, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+    
+    myDisplay.displayText(arrTgl, myDisplay.getTextAlignment(), 50, 200, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+    
+    myDisplay.displayReset();
+
+    counter++; 
+
+    if (counter > 1)
+    {
+      posisi = "jam";
+      counter = 0;
+      myDisplay.displayClear();
+    }
+
+    delay(100);
+  }
+
+}
+
+// end of skecth
