@@ -1,3 +1,5 @@
+The Short Video on YouTube : https://youtube.com/shorts/HGn8dT8EXaI
+
 
 ![IMG_20240124_233153](https://github.com/aprijunaidi/Automatic-Clock-Using-ESP32-and-NTP/assets/7279471/74d2db1b-3a0b-4627-ac75-c82b3e4ecbd4)
 
